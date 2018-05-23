@@ -38,6 +38,21 @@
         }
 
         then(...args) {
+            const child = new this.constructor(noop);
+
+            const handler = fn => data => {
+                if (typeof fn === 'function') {
+                    const result = fn(data)
+                    if (isPromise(result)) {
+                        Object.assign(child, result)
+                    } else {
+                        statusProvider(child, FULFILLED)(result)
+                    }
+                } else if (!fn) {
+                    statusProvider(child, this.status)(data)
+                }
+            };
+
             switch (this.status) {
                 case PENDING: {
                     this.successListener.push(args[0]);
@@ -54,7 +69,7 @@
                 }
             }
 
-            return this;
+            return child;
         }
 
         catch(arg) {
@@ -62,12 +77,24 @@
         }
     }
 
-    MyPromise.race = function(promises) {
-
+    MyPromise.race = function (promises) {
+        return new MyPromise((resolve, reject) => {
+            promises.forEach((promise, index) => {
+                promise.then(resolve, reject);
+            });
+        });
     }
 
     MyPromise.all = function (promises) {
+        return new MyPromise((resolve, reject) => {
+            let done = gen(promises.length, resolve);
 
+            promises.forEach((promise, index) => {
+                promise.then((value) => {
+                    done(index, value)
+                }, reject)
+            });
+        });
     }
 
     window.MyPromise = MyPromise;
